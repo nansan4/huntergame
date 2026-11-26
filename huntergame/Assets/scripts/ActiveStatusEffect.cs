@@ -1,6 +1,7 @@
+using System;
 using UnityEngine;
 
-public class ActiveStatusEffect
+public class ActiveStatusEffect : IComparable<ActiveStatusEffect>
 {
     public StatusEffects Effect { get; private set; }
     public BodyPart TargetBodyPart { get; private set; }
