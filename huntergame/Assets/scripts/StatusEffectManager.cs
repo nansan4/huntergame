@@ -10,8 +10,8 @@ using RemovableType = StatusEffects.RemovableType;
 public class StatusEffectManager : MonoBehaviour
 {
     private float currTime;
-    private List<StatusEffects> existingEffectsList = new List<StatusEffects>();
-    private List<StatusEffectType> existingEffectsTypesList = new List<StatusEffectType>();
+    private List<ActiveStatusEffect> existingEffectsList = new List<ActiveStatusEffect>();
+    //private List<StatusEffectType> existingEffectsTypesList = new List<StatusEffectType>();
 
 
     private CharacterStats stats;
@@ -52,102 +52,150 @@ public class StatusEffectManager : MonoBehaviour
 
         for(int i = existingEffectsList.Count - 1; i >=0; i--)
         {
-            if (existingEffectsList[i]._persistentEffect != null)
+            ActiveStatusEffect active = existingEffectsList[i];
+
+            if (active.Effect._persistentEffect != null)
             {
-                existingEffectsList[i]._persistentEffect(stats);
+                StatusEffectContext context =
+                    new StatusEffectContext(stats, active.TargetBodyPart);
+
+                active.Effect._persistentEffect(context);
             }
         }
     }
     private void TrimExpiredEffects()
     {
-        for(int i = existingEffectsList.Count-1; i >=0; i--)
+        for (int i = existingEffectsList.Count - 1; i >= 0; i--)
         {
-            if (existingEffectsList[i]._expirableType.Equals(ExpirableType.Expirable) && existingEffectsList[i].HasExpired(currTime){
-                if (existingEffectsList[i]._onLeaveEffect != null)
+            ActiveStatusEffect active = existingEffectsList[i];
+
+            if (active.HasExpired(currTime))
+            {
+                if (active.Effect._onLeaveEffect != null)
                 {
-                    existingEffectsList[i]._onLeaveEffect(stats);
+                    StatusEffectContext context =
+                        new StatusEffectContext(stats, active.TargetBodyPart);
+
+                    active.Effect._onLeaveEffect(context);
                 }
+
                 existingEffectsList.RemoveAt(i);
-                RebuildExistingEffectTypesList();
+
                 hasBuffListChanged = true;
             }
         }
     }
     private void ProcAllTickingEffects()
     {
-        for(int i = 0; i < existingEffectsList.Count; i++)
+        for (int i = 0; i < existingEffectsList.Count; i++)
         {
-            if (existingEffectsList[i]._tickEffect != null) // if the status can tick
-            {
-                if (existingEffectsList[i]._nextTickTime <= currTime) // if the tick is ready to proc
-                {
-                    existingEffectsList[i].SetTickedTime(existingEffectsList[i]._nextTickTime + existingEffectsList[i]._tickInterval);
-                    existingEffectsList[i]._tickEffect(stats);
-                }
-            }
-        }
-    }
-    public void AddEffect(StatusEffects statusEffect)
-    {
-        if (existingEffectsTypesList.Contains(statusEffect._effectType))
-        {
-            if (statusEffect._canStack)
-            {
-                Debug.Log("it doesnt");
-            }
-            else
-            {
-                for(int i = 0; i < existingEffectsList.Count; i++)
-                {
-                    if (existingEffectsList[i]._effectType == statusEffect._effectType)
-                    {
-                        if(statusEffect._expiryTime > existingEffectsList[i]._expiryTime)
-                        {
-                            existingEffectsList[i]._expiryTime = statusEffect._expiryTime;
-                        }
-                        return;
-                    }
-                }
-                Debug.LogError("Bug");
-            }
+            ActiveStatusEffect active = existingEffectsList[i];
 
-        }
-        else
-        {
-            existingEffectsList.Add(statusEffect);
-            statusEffect.SetTickedTime(Time.time + statusEffect._tickInterval);
-            hasBuffListChanged = true;
-            RebuildExistingEffectTypesList();
+            if (active.Effect._tickEffect == null)
+                continue;
+
+            if (active.Effect._tickInterval <= 0)
+                continue;
+
+            if (active.NextTickTime <= currTime)
+            {
+                active.NextTickTime =
+                    currTime + active.Effect._tickInterval;
+
+                StatusEffectContext context =
+                    new StatusEffectContext(stats, active.TargetBodyPart);
+
+                active.Effect._tickEffect(context);
+            }
         }
     }
-    public void RemoveEffect(StatusEffectType type, bool triggerOnLeaveEffect) 
+    public void AddEffect(StatusEffects statusEffect,
+        BodyPart targetBodyPart = null)
     {
-        if (existingEffectsTypesList.Contains(type))
+        for (int i = 0; i < existingEffectsList.Count; i++)
         {
-            for (int i = 0; i < existingEffectsTypesList.Count; i++)
+            ActiveStatusEffect existing = existingEffectsList[i];
+
+            bool sameEffect =
+                existing.Effect._effectType == statusEffect._effectType;
+
+            bool sameTarget =
+                existing.TargetBodyPart == targetBodyPart;
+
+            if (sameEffect && sameTarget)
             {
-                if (existingEffectsList[i]._effectType == type)
+                if (!statusEffect._canStack)
                 {
-                    if (triggerOnLeaveEffect && existingEffectsList[i]._onLeaveEffect != null)
+                    if (statusEffect._expirableType ==
+                        StatusEffects.ExpirableType.Expirable)
                     {
-                        existingEffectsList[i]._onLeaveEffect(stats);
+                        existing.ExpiryTime = Mathf.Max(
+                            existing.ExpiryTime,
+                            Time.time + statusEffect.duration
+                        );
                     }
-                    existingEffectsList.RemoveAt(i);
-                    hasBuffListChanged = true;
-                    RebuildExistingEffectTypesList();
+
                     return;
                 }
             }
         }
-    }
-    private void RebuildExistingEffectTypesList()
-    {
-        existingEffectsTypesList.Clear();
-        for(int i = 0; i < existingEffectsList.Count; i++)
+
+        // Create a new active instance.
+        ActiveStatusEffect newEffect =
+            new ActiveStatusEffect(statusEffect, targetBodyPart);
+
+        existingEffectsList.Add(newEffect);
+
+        // Execute the initial effect.
+        if (statusEffect._entryEffect != null)
         {
-            existingEffectsTypesList.Add(existingEffectsList[i]._effectType);
+            StatusEffectContext context =
+                new StatusEffectContext(stats, targetBodyPart);
+
+            statusEffect._entryEffect(context);
+        }
+
+        hasBuffListChanged = true;
+    }
+    public void RemoveEffect(StatusEffects.StatusEffectType type,
+        BodyPart targetBodyPart = null,
+        bool triggerOnLeaveEffect = true) 
+    {
+        for (int i = existingEffectsList.Count - 1; i >= 0; i--)
+        {
+            ActiveStatusEffect active = existingEffectsList[i];
+
+            bool sameEffect = active.Effect._effectType == type;
+            bool sameTarget = active.TargetBodyPart == targetBodyPart;
+
+            if (sameEffect && sameTarget)
+            {
+                if (triggerOnLeaveEffect &&
+                    active.Effect._onLeaveEffect != null)
+                {
+                    StatusEffectContext context =
+                        new StatusEffectContext(stats, targetBodyPart);
+
+                    active.Effect._onLeaveEffect(context);
+                }
+
+                existingEffectsList.RemoveAt(i);
+
+                hasBuffListChanged = true;
+
+                return;
+            }
         }
     }
+
+    //private void RebuildExistingEffectTypesList()
+    //{
+    //    existingEffectsTypesList.Clear();
+    //    for(int i = 0; i < existingEffectsList.Count; i++)
+    //    {
+    //        existingEffectsTypesList.Add(existingEffectsList[i]._effectType);
+    //    }
+    //}
 
     
 

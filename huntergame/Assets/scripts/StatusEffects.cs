@@ -1,13 +1,13 @@
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "tempStatus", menuName = "New Status")]
-public class StatusEffects : MonoBehaviour
+public class StatusEffects : ScriptableObject
 {
     
 
     
 
-    public delegate void StatusEffectApplicator(CharacterStats stats);
+    public delegate void StatusEffectApplicator(StatusEffectContext context);
 
     public enum StatusEffectType { None,
         ExampleTempStatus,  // expiring statuses
@@ -37,7 +37,7 @@ public class StatusEffects : MonoBehaviour
     public ExpirableType _expirableType;
     protected int currTickCount = 0;
 
-    [SerializeField] protected float duration;
+    [SerializeField] public float duration;
 
     //Initial effect that is called once when applied
     public StatusEffectApplicator _entryEffect;
@@ -48,7 +48,7 @@ public class StatusEffects : MonoBehaviour
     //a DOT effect that occurs once every _tickInterval
     public StatusEffectApplicator _tickEffect;
     public float _tickInterval;
-    public float _nextTickTime = 0f;
+    //public float _nextTickTime = 0f;
 
     //effect that is called when the effect leaves the entity one way or another
     public StatusEffectApplicator _onLeaveEffect;
@@ -90,10 +90,10 @@ public class StatusEffects : MonoBehaviour
         return false;
     }
 
-    public void SetTickedTime(float t)
-    {
-        _nextTickTime = t;
-    }
+    //public void SetTickedTime(float t)
+    //{
+    //    _nextTickTime = t;
+    //}
 
 
     

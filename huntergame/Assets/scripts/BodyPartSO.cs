@@ -1,16 +1,23 @@
 using UnityEngine;
 
-public class BodyPartSO : MonoBehaviour
-{
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        
-    }
 
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
+public enum BodyPartType
+{
+    Head,
+    Chest,
+    LeftArm,
+    RightArm,
+    LeftLeg,
+    RightLeg
+}
+[CreateAssetMenu(fileName = "NewBodyPart", menuName = "BodyPart")]
+public class BodyPartSO : ScriptableObject
+{
+   
+    public BodyPartType partType;
+
+    public float maxHealth = 100f; //temp
+
+    public bool deathWhenDestroyed;
+
 }
