@@ -11,4 +11,10 @@ public class CharacterStats : MonoBehaviour
     public float stamina;
 
     public List<BodyPartSO> bodyParts;
+
+
+    public void ResetToInitialValues()
+    {
+
+    }
 }
